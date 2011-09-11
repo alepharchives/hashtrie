@@ -117,6 +117,9 @@ timeit(Fun) ->
 
 file(Ns) ->
     Files = [
+	{pht_put, "data/pht_put.dat"},
+	{pht_get, "data/pht_get.dat"},
+	{pht_upd, "data/pht_update.dat"},
 	{ht_put, "data/ht_put.dat"},
 	{ht_get, "data/ht_get.dat"},
 	{ht_upd, "data/ht_update.dat"},
@@ -146,20 +149,27 @@ file(Ns) ->
 
 file([],_) -> ok; 
 file([N|Ns], Fds) ->
+    Vs = go(N),
+    {Ph, Gh, Uh} = proplists:get_value(pht, Vs),
+
     lists:foreach(fun
+	    ({pht, {P, G, U}}) ->
+		pout(ht:get(pht_put, Fds), N, 1.0),
+		pout(ht:get(pht_upd, Fds), N, 1.0),
+		pout(ht:get(pht_get, Fds), N, 1.0);
 	    ({ht, {P, G, U}}) ->
-		pout(ht:get(ht_put, Fds), N, P),
-		pout(ht:get(ht_upd, Fds), N, U),
-		pout(ht:get(ht_get, Fds), N, G);
+		pout(ht:get(ht_put, Fds), N, P/Ph),
+		pout(ht:get(ht_upd, Fds), N, U/Uh),
+		pout(ht:get(ht_get, Fds), N, G/Gh);
 	    ({dict, {P, G, U}}) ->
-		pout(ht:get(di_put, Fds), N, P),
-		pout(ht:get(di_upd, Fds), N, U),
-		pout(ht:get(di_get, Fds), N, G);
+		pout(ht:get(di_put, Fds), N, P/Ph),
+		pout(ht:get(di_upd, Fds), N, U/Uh),
+		pout(ht:get(di_get, Fds), N, G/Gh);
 	    ({gb_trees, {P, G, U}}) ->
-		pout(ht:get(gb_put, Fds), N, P),
-		pout(ht:get(gb_upd, Fds), N, U),
-		pout(ht:get(gb_get, Fds), N, G)
-	end, go(N)),
+		pout(ht:get(gb_put, Fds), N, P/Ph),
+		pout(ht:get(gb_upd, Fds), N, U/Uh),
+		pout(ht:get(gb_get, Fds), N, G/Gh)
+	end, Vs),
     file(Ns, Fds).
 
 
@@ -168,34 +178,35 @@ pout(Fd, N, R) ->
 
 
 go(N) when is_integer(N) ->
-    {Hi, Th} = timeit(fun() -> hashtrie_test:ht_put(N) end),
-    sout(N, "ht", "put", Hi, Hi),
-    {Hp, ok} = timeit(fun() -> hashtrie_test:ht_get(N,Th) end),
-    sout(N, "get", Hp, Hp),
-    {Hu, _} = timeit(fun() -> hashtrie_test:ht_update(N,Th) end),
-    sout(N, "update", Hu, Hu),
 
     {Pi, Tp} = timeit(fun() -> hashtrie_test:pht_put(N) end),
-    sout(N, "pht", "put", Pi, Hi),
+    sout(N, "pht", "put", Pi, Pi),
     {Pp, ok} = timeit(fun() -> hashtrie_test:pht_get(N,Tp) end),
-    sout(N, "get", Pp, Hp),
+    sout(N, "get", Pp, Pp),
     {Pu, _} = timeit(fun() -> hashtrie_test:pht_update(N,Tp) end),
-    sout(N, "update", Pu, Hu),
+    sout(N, "update", Pu, Pu),
+
+    {Hi, Th} = timeit(fun() -> hashtrie_test:ht_put(N) end),
+    sout(N, "ht", "put", Hi, Pi),
+    {Hp, ok} = timeit(fun() -> hashtrie_test:ht_get(N,Th) end),
+    sout(N, "get", Hp, Pp),
+    {Hu, _} = timeit(fun() -> hashtrie_test:ht_update(N,Th) end),
+    sout(N, "update", Hu, Pu),
 
 
     {Gi, Tg} = timeit(fun() -> hashtrie_test:gb_trees_put(N) end),
-    sout(N, "gb_trees", "insert", Gi, Hi),
+    sout(N, "gb_trees", "insert", Gi, Pi),
     {Gp, ok} = timeit(fun() -> hashtrie_test:gb_trees_get(N, Tg) end),
-    sout(N, "get", Gp, Hp),
+    sout(N, "get", Gp, Pp),
     {Gu, ok} = timeit(fun() ->hashtrie_test:gb_trees_update(N, Tg) end),
-    sout(N, "update", Gu, Hu),
+    sout(N, "update", Gu, Pu),
 
     {Di, Td} = timeit(fun() -> hashtrie_test:dict_put(N) end),
-    sout(N, "dict", "store", Di, Hi),
+    sout(N, "dict", "store", Di, Pi),
     {Dp, ok} = timeit(fun() -> hashtrie_test:dict_get(N, Td) end),
-    sout(N, "fetch", Dp, Hp),
+    sout(N, "fetch", Dp, Pp),
     {Du, _} = timeit(fun() -> hashtrie_test:dict_update(N, Td) end),
-    sout(N, "update", Du, Hu),
+    sout(N, "update", Du, Pu),
 
     {TAi, TAa} = timeit(fun() -> hashtrie_test:tarray_put(N) end),
     sout(N, "tarray", "set", TAi, TAi),
@@ -207,7 +218,7 @@ go(N) when is_integer(N) ->
     {Ap, _ } = timeit(fun() -> hashtrie_test:array_get(N,Ta) end),
     sout(N, "get", Ap, TAp),
 
-    [{ht, {Hi, Hp, Hu}}, {gb_trees, {Gi, Gp, Gu}}, {dict, {Di, Dp, Du}}].
+    [{pht, {Pi, Pp, Pu}}, {ht, {Hi, Hp, Hu}}, {gb_trees, {Gi, Gp, Gu}}, {dict, {Di, Dp, Du}}].
 
 sout(N, Mstr, Fstr, Val, Cval) ->
     Nf = length(Fstr),
